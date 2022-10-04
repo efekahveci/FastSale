@@ -65,7 +65,7 @@ public class EventBusServiceBus : BaseEventBus
 
         }
 
-        _logger.Log($"Subscribing to event {eventName}");
+        _logger.LogInformation($"Subscribing to event {eventName}");
 
         _subscriptionManager.AddSubscription<T, TH>();
     }
