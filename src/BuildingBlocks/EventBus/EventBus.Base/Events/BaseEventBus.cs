@@ -14,7 +14,7 @@ public abstract class BaseEventBus : IEventBus
 {
     public readonly IServiceProvider _serviceProvider;
     public readonly IEventBusSubscriptionManager _subscriptionManager;
-    private EventBusConfig _eventBusConfig;
+    public EventBusConfig _eventBusConfig { get; set; }
 
     public BaseEventBus(EventBusConfig eventBusConfig, IServiceProvider serviceProvider)
     {
@@ -33,51 +33,42 @@ public abstract class BaseEventBus : IEventBus
         return eventName;
     }
 
-    public virtual string GetSubName(string eventName) => $"{_eventBusConfig.SubscriberClientAppName}.{ProcessEventName(eventName)}";  
-    
-    public virtual void Dispose() => _eventBusConfig = null;
+    public virtual string GetSubName(string eventName) => $"{_eventBusConfig.SubscriberClientAppName}.{ProcessEventName(eventName)}";
+
+    public virtual void Dispose() { _eventBusConfig = null; _subscriptionManager.Clear(); }
 
 
-    public async Task<bool> ProcessEvent (string eventName, string message)
+    public async Task<bool> ProcessEvent(string eventName, string message)
     {
-        eventName=ProcessEventName(eventName);
+        eventName = ProcessEventName(eventName);
         var processed = false;
         if (_subscriptionManager.HasSubscriptionForEvent(eventName))
         {
-            var subs =_subscriptionManager.GetHandlersForEvent(eventName);
+            var subs = _subscriptionManager.GetHandlersForEvent(eventName);
 
             using (var scope = _serviceProvider.CreateScope())
             {
                 foreach (var sub in subs)
                 {
-                    var handler = _serviceProvider.GetService(sub.HandlerType); 
-                    if(handler is null) continue;
+                    var handler = _serviceProvider.GetService(sub.HandlerType);
+                    if (handler is null) continue;
                     var eventType = _subscriptionManager.GetEventTypeByName($"{_eventBusConfig.EventNamePrefix}{eventName}{_eventBusConfig.EventNameSuffix}");
                     var integrationEvent = JsonSerializer.Deserialize(message, eventType);
 
 
                     var concreteType = typeof(IIntegrationEventHandler<>).MakeGenericType(eventType);
-                    await (Task) concreteType.GetMethod("Handle").Invoke(handler,new object[] { integrationEvent });
+                    await (Task)concreteType.GetMethod("Handle").Invoke(handler, new object[] { integrationEvent });
 
                 }
             }
-            processed = true;   
+            processed = true;
         }
         return processed;
     }
 
-    public void Publish(IntegrationEvent integrationEvent)
-    {
-        throw new NotImplementedException();
-    }
+    public abstract void Publish(IntegrationEvent integrationEvent);
 
-    public void Subscribe<T, TH>() where T : IntegrationEvent where TH : IIntegrationEventHandler<T>
-    {
-        throw new NotImplementedException();
-    }
+    public abstract void Subscribe<T, TH>() where T : IntegrationEvent where TH : IIntegrationEventHandler<T>;
 
-    public void UnSubscribe<T, TH>() where T : IntegrationEvent where TH : IIntegrationEventHandler<T>
-    {
-        throw new NotImplementedException();
-    }
+    public abstract void UnSubscribe<T, TH>() where T : IntegrationEvent where TH : IIntegrationEventHandler<T>;
 }
